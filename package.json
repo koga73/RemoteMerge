@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/koga73/RemoteMerge/issues"
   },
-  "homepage": "https://github.com/koga73/RemoteMerge#readme"
+  "homepage": "https://github.com/koga73/RemoteMerge#readme",
+  "dependencies": {
+    "jszip": "^3.2.1"
+  }
 }

@@ -12,6 +12,11 @@ const RemoteMerge = require("./remote-merge.js");
 
 		var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
 		console.log(comparison);
+		console.log();
+
+		var zip = await RemoteMerge.package("./test/b", comparison);
+		//console.log(zip);
+		await RemoteMerge.saveZip(zip);
 	} catch (err){
 		console.error("CAUGHT ERROR:", err);
 	}
