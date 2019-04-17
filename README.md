@@ -36,6 +36,8 @@ Note you can specify a file filter and hashing algorithm (MD5 by default)
 RemoteMerge.snapshot("./test/a", /^.+\.txt$/, "sha256")
 ```
 
+---
+
 ### Compare
 
 #### Compare snapshots
@@ -44,6 +46,8 @@ var originalSnapshot = await RemoteMerge.load("original-snapshot.json");
 var modifiedSnapshot = await RemoteMerge.load("modified-snapshot.json");
 var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
 ```
+
+---
 
 ### Packages
 
