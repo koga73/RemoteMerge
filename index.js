@@ -8,7 +8,7 @@ const RemoteMerge = require("./remote-merge.js");
 
 		var modifiedSnapshot = await RemoteMerge.snapshot("./test/b", /^.+\.txt$/);
 		//console.log("modified:", modifiedSnapshot);
-		//await RemoteMerge.save("modified-snapshot.json", originalSnapshot);
+		//await RemoteMerge.save("modified-snapshot.json", modifiedSnapshot);
 
 		var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
 		console.log(comparison);
@@ -18,9 +18,11 @@ const RemoteMerge = require("./remote-merge.js");
 		//console.log(zip);
 		await RemoteMerge.saveZip(zip);*/
 
-		//RemoteMerge.generateMergePackage("./test/a", "./test/b");
+		//Build package
+		var packageName = await RemoteMerge.generateMergePackage("./test/a", "./test/b");
 
-		RemoteMerge.applyMergePackage("./test/a", "remote-merge_1555459586939.zip");
+		//Apply package
+		await RemoteMerge.applyMergePackage("./test/a", packageName);
 
 		//Make sure to create a 'c' folder
 		//RemoteMerge.zipToDir((await RemoteMerge.loadZip("remote-merge_1555459586939.zip")), "./test/c");
