@@ -9,6 +9,10 @@ const RemoteMerge = require("./remote-merge.js");
 		//Apply package containing what changed to our original content
 		await RemoteMerge.applyMergePackage("./test/a", packageName);
 
+		//Note that the zip filename is optional. If not specified one will be generated
+		//Note you can specify a file filter and hashing algorithm (MD5 by default)
+		//await RemoteMerge.generateMergePackage("./test/a", "./test/b", "package.zip", /^.+\.txt$/, "sha256");
+
 		//Advanced API
 		/*
 		//Take a snapshot of a folder
@@ -32,7 +36,7 @@ const RemoteMerge = require("./remote-merge.js");
 		//Apply package
 		//Our package containing what changed gets applied to the original content
 		var zip = await RemoteMerge.loadZip("package.zip");
-		await RemoteMerge.applyPackage("./test/b", zip); //Note that the zip filename is optional. If not specified one will be generated.
+		await RemoteMerge.applyPackage("./test/b", zip); //Note that the zip filename is optional. If not specified one will be generated
 		*/
 	} catch (err){
 		console.error("CAUGHT ERROR:", err);

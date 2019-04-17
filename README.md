@@ -9,10 +9,16 @@ npm i
 ## Simple API
 ```node
 //Build package comparing original content in 'a' to modified content in 'b'
-var packageName = await RemoteMerge.generateMergePackage("./test/a", "./test/b");
+var packageName = await RemoteMerge.generateMergePackage("./test/a", "./test/b", "package.zip");
 
 //Apply package containing what changed to our original content
 await RemoteMerge.applyMergePackage("./test/a", packageName);
+```
+
+Note that the zip filename is optional. If not specified one will be generated
+Note you can specify a file filter and hashing algorithm (MD5 by default)
+```node
+var packageName = await RemoteMerge.generateMergePackage("./test/a", "./test/b", "package.zip", /^.+\.txt$/, "sha256");
 ```
 
 ## Advanced API
@@ -57,7 +63,7 @@ var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
 var zip = await RemoteMerge.generatePackage("./test/b", comparison);
 await RemoteMerge.saveZip(zip, "./package.zip");
 ```
-Note that the zip filename is optional. If not specified one will be generated.
+Note that the zip filename is optional. If not specified one will be generated
 
 #### Apply package
 ```node
