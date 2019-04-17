@@ -194,9 +194,6 @@ class RemoteMerge {
 						//Directory
 						case (RemoteMerge.isObject(comparisonVal)):
 							if (DEBUG){
-								console.log("RECURSE", fullPath);
-							}
-							if (DEBUG){
 								console.log("ADD FOLDER", relativePath, name);
 							}
 							//Recurse
@@ -289,26 +286,38 @@ class RemoteMerge {
 					switch (comparisonVal){
 						case RemoteMerge.DELETED:
 							if (stat){
-								//Delete
+								if (DEBUG){
+									console.log("DELETE", fullPath);
+								}
 								fs.unlinkSync(fullPath);
 							}
 							break;
 	
 						case RemoteMerge.MODIFIED_FILE:
 							if (stat){
-								//Delete
+								if (DEBUG){
+									console.log("DELETE", fullPath);
+								}
 								fs.unlinkSync(fullPath);
 							}
 						case RemoteMerge.ADDED_FILE:
+							if (DEBUG){
+								console.log("ADD FILE", fullPath);
+							}
 							await RemoteMerge.save(fullPath, await zip.file(name).async("nodebuffer"), false);
 							break;
 	
 						case RemoteMerge.MODIFIED_DIR:
 							if (stat){
-								//Delete
+								if (DEBUG){
+									console.log("DELETE", fullPath);
+								}
 								fs.unlinkSync(fullPath);
 							}
 						case RemoteMerge.ADDED_DIR:
+							if (DEBUG){
+								console.log("ADD DIR", fullPath);
+							}
 							fs.mkdirSync(fullPath);
 							//Recurse
 							await applyPackage(fullPath, comparison, zip.folder(name));
