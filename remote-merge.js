@@ -1,9 +1,10 @@
-const fs = require("fs");
+const fs = require("fs-extra"); //fs-extra needed for removing non-empty directories
 const crypto = require("crypto");
 
 const JSZip = require("jszip");
 
-const REGEX_PATTERN = /^.+$/;
+const REGEX_SNAPSHOT = /^.+$/;
+const REGEX_DIR = /^.+(\\|\/)$/
 const HASH_ALGORITHM = "md5"; //Fast and fine for most applications
 
 const DEBUG = true;
@@ -41,7 +42,7 @@ class RemoteMerge {
 	}
 
 	static snapshot(dir, fileRegex, hashAlgorithm){
-		fileRegex = fileRegex || REGEX_PATTERN;
+		fileRegex = fileRegex || REGEX_SNAPSHOT;
 		hashAlgorithm = hashAlgorithm || HASH_ALGORITHM;
 
 		return new Promise((resolve, reject) => {
@@ -214,7 +215,7 @@ class RemoteMerge {
 	}
 
 	static dirToZip(dir, fileRegex, zip, zipCurrentPath){
-		fileRegex = fileRegex || REGEX_PATTERN;
+		fileRegex = fileRegex || REGEX_SNAPSHOT;
 		zip = zip || new JSZip();
 		zipCurrentPath = zipCurrentPath || "";
 
@@ -256,8 +257,47 @@ class RemoteMerge {
 		});
 	}
 
-	static applyPackage(originalDir, comparison, zip){
-		comparison = this.comparison || null;
+	static zipToDir(zip, dir){
+		if (!REGEX_DIR.test(dir)){
+			dir += '/';
+		}
+
+		return new Promise(async (resolve, reject) => {
+			//Needed to get files within root context
+			var files = zip.filter((name, file) => {
+				return true;
+			});
+
+			var filesLen = files.length;
+			for (var i = 0; i < filesLen; i++){
+				var file = files[i];
+				var name = file.name.replace(new RegExp("^" + zip.root), "");
+				var fullPath = dir + name;
+
+				//Don't overwrite files
+				if (!fs.existsSync(fullPath)){
+					if (file.dir){
+						if (DEBUG){
+							console.log("ADDED DIR", fullPath);
+						}
+						fs.mkdirSync(fullPath);
+					} else {
+						if (DEBUG){
+							console.log("ADDED FILE", fullPath);
+						}
+						await RemoteMerge.save(fullPath, await zip.file(name).async("nodebuffer"), false);
+					}
+				}
+			}
+			resolve();
+		});
+	}
+
+	static applyPackage(originalDir, zip, comparison){
+		if (!REGEX_DIR.test(originalDir)){
+			originalDir += '/';
+		}
+		comparison = comparison || null;
 
 		return new Promise(async (resolve, reject) => {
 			if (!comparison){
@@ -283,44 +323,73 @@ class RemoteMerge {
 				}
 
 				try {
-					switch (comparisonVal){
-						case RemoteMerge.DELETED:
-							if (stat){
-								if (DEBUG){
-									console.log("DELETE", fullPath);
-								}
-								fs.unlinkSync(fullPath);
+					switch (true){
+						//Take action
+						case (RemoteMerge.isString(comparisonVal)):
+							switch (comparisonVal){
+								case RemoteMerge.DELETED:
+									if (stat){
+										if (stat.isDirectory()){
+											if (DEBUG){
+												console.log("DELETE DIR", fullPath);
+											}
+											fs.removeSync(fullPath);
+										} else {
+											if (DEBUG){
+												console.log("DELETE FILE", fullPath);
+											}
+											fs.unlinkSync(fullPath);
+										}
+										stat = null;
+									}
+									break;
+			
+								case RemoteMerge.MODIFIED_FILE:
+									if (stat){
+										if (DEBUG){
+											console.log("MODIFY DELETE FILE", fullPath);
+										}
+										fs.unlinkSync(fullPath);
+										stat = null;
+									}
+								case RemoteMerge.ADDED_FILE:
+									if (!stat){
+										if (DEBUG){
+											console.log("ADD FILE", fullPath);
+										}
+										await RemoteMerge.save(fullPath, await zip.file(name).async("nodebuffer"), false);
+									}
+									break;
+			
+								case RemoteMerge.MODIFIED_DIR:
+									if (stat){
+										if (DEBUG){
+											console.log("MODIFY DELETE DIR", fullPath);
+										}
+										fs.removeSync(fullPath);
+										stat = null;
+									}
+								case RemoteMerge.ADDED_DIR:
+									if (!stat){
+										if (DEBUG){
+											console.log("ADD DIR", fullPath);
+										}
+										fs.mkdirSync(fullPath);
+									}
+									await RemoteMerge.zipToDir(zip.folder(name), fullPath);
+									break;
 							}
 							break;
-	
-						case RemoteMerge.MODIFIED_FILE:
-							if (stat){
+						//Recurse
+						case (RemoteMerge.isObject(comparisonVal)):
+							if (!stat){
 								if (DEBUG){
-									console.log("DELETE", fullPath);
+									console.log("ADD DIR", fullPath);
 								}
-								fs.unlinkSync(fullPath);
+								fs.mkdirSync(fullPath);
 							}
-						case RemoteMerge.ADDED_FILE:
-							if (DEBUG){
-								console.log("ADD FILE", fullPath);
-							}
-							await RemoteMerge.save(fullPath, await zip.file(name).async("nodebuffer"), false);
-							break;
-	
-						case RemoteMerge.MODIFIED_DIR:
-							if (stat){
-								if (DEBUG){
-									console.log("DELETE", fullPath);
-								}
-								fs.unlinkSync(fullPath);
-							}
-						case RemoteMerge.ADDED_DIR:
-							if (DEBUG){
-								console.log("ADD DIR", fullPath);
-							}
-							fs.mkdirSync(fullPath);
 							//Recurse
-							await applyPackage(fullPath, comparison, zip.folder(name));
+							await RemoteMerge.applyPackage(fullPath, zip.folder(name), comparison[name]);
 							break;
 					}
 				} catch (err){

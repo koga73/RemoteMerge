@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/koga73/RemoteMerge#readme",
   "dependencies": {
+    "fs-extra": "^7.0.1",
     "jszip": "^3.2.1"
   }
 }

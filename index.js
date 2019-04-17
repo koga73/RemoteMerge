@@ -21,6 +21,9 @@ const RemoteMerge = require("./remote-merge.js");
 		//RemoteMerge.generateMergePackage("./test/a", "./test/b");
 
 		RemoteMerge.applyMergePackage("./test/a", "remote-merge_1555459586939.zip");
+
+		//Make sure to create a 'c' folder
+		//RemoteMerge.zipToDir((await RemoteMerge.loadZip("remote-merge_1555459586939.zip")), "./test/c");
 	} catch (err){
 		console.error("CAUGHT ERROR:", err);
 	}
