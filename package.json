@@ -1,0 +1,23 @@
+{
+  "name": "remote-merge",
+  "version": "1.0.0",
+  "description": "\"Snapshot\" folders, compare snapshots, build packages, merge between local and remote systems",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koga73/RemoteMerge.git"
+  },
+  "author": "AJ Savino",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/koga73/RemoteMerge/issues"
+  },
+  "homepage": "https://github.com/koga73/RemoteMerge#readme",
+  "dependencies": {
+    "fs-extra": "^7.0.1",
+    "jszip": "^3.2.1"
+  }
+}
