@@ -2,7 +2,7 @@ const RemoteMerge = require("./remote-merge.js");
 
 (async () => {
 	try {
-		var originalSnapshot = await RemoteMerge.snapshot("./test/a", /^.+\.txt$/);
+		/*var originalSnapshot = await RemoteMerge.snapshot("./test/a", /^.+\.txt$/);
 		//console.log("original:", originalSnapshot);
 		//await RemoteMerge.save("original-snapshot.json", originalSnapshot);
 
@@ -14,9 +14,13 @@ const RemoteMerge = require("./remote-merge.js");
 		console.log(comparison);
 		console.log();
 
-		var zip = await RemoteMerge.package("./test/b", comparison);
+		var zip = await RemoteMerge.generatePackage("./test/b", comparison);
 		//console.log(zip);
-		await RemoteMerge.saveZip(zip);
+		await RemoteMerge.saveZip(zip);*/
+
+		//RemoteMerge.generateMergePackage("./test/a", "./test/b");
+
+		RemoteMerge.applyMergePackage("./test/a", "remote-merge_1555459586939.zip");
 	} catch (err){
 		console.error("CAUGHT ERROR:", err);
 	}

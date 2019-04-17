@@ -13,6 +13,33 @@ class RemoteMerge {
 		this.interface = this;
 	}
 
+	static generateMergePackage(originalDir, modifiedDir, zipOutput, fileRegex, hashAlgorithm){
+		return new Promise(async (resolve, reject) => {
+			try {
+				var originalSnapshot = await RemoteMerge.snapshot(originalDir, fileRegex, hashAlgorithm);
+				var modifiedSnapshot = await RemoteMerge.snapshot(modifiedDir, fileRegex, hashAlgorithm);
+				var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
+				var zip = await RemoteMerge.generatePackage(modifiedDir, comparison);
+				resolve(RemoteMerge.saveZip(zip, zipOutput));
+			} catch (err){
+				reject(err);
+				return;
+			}
+		});
+	}
+
+	static applyMergePackage(originalDir, zipPath){
+		return new Promise(async (resolve, reject) => {
+			try {
+				var zip = await RemoteMerge.loadZip(zipPath);
+				resolve(RemoteMerge.applyPackage(originalDir, zip));
+			} catch (err){
+				reject(err);
+				return;
+			}
+		});
+	}
+
 	static snapshot(dir, fileRegex, hashAlgorithm){
 		fileRegex = fileRegex || REGEX_PATTERN;
 		hashAlgorithm = hashAlgorithm || HASH_ALGORITHM;
@@ -59,31 +86,55 @@ class RemoteMerge {
 				switch (true){
 					//File
 					case (RemoteMerge.isString(originalVal)):
-						if (originalSnapshot[name] !== modifiedSnapshot[name]){
-							comparison[name] = RemoteMerge.MODIFIED;
+						if (originalVal !== modifiedVal){
+							switch (true){
+								//File
+								case (RemoteMerge.isString(originalVal)):
+									comparison[name] = RemoteMerge.MODIFIED_FILE;
+									break;
+								//Directory
+								case (RemoteMerge.isObject(originalVal)):
+									comparison[name] = RemoteMerge.MODIFIED_DIR;
+									break;
+							}
 						}
 						break;
 					//Directory
 					case (RemoteMerge.isObject(originalVal)):
-						if (RemoteMerge.isObject(modifiedVal)){
-							//Recurse
-							comparison[name] = RemoteMerge.compare(originalVal, modifiedVal);
-						} else {
-							comparison[name] = RemoteMerge.MODIFIED;
+						switch (true){
+							//File
+							case (RemoteMerge.isString(modifiedVal)):
+								comparison[name] = RemoteMerge.MODIFIED_FILE;
+								break;
+							//Directory
+							case (RemoteMerge.isObject(modifiedVal)):
+								//Recurse
+								comparison[name] = RemoteMerge.compare(originalVal, modifiedVal);
+								break;
 						}
 						break;
 				}
 			}
 		}
 		for (var name in modifiedSnapshot){
+			var modifiedVal = modifiedSnapshot[name];
 			if (typeof originalSnapshot[name] === typeof undefined){
-				comparison[name] = RemoteMerge.ADDED;
+				switch (true){
+					//File
+					case (RemoteMerge.isString(modifiedVal)):
+						comparison[name] = RemoteMerge.ADDED_FILE;
+						break;
+					//Directory
+					case (RemoteMerge.isObject(modifiedVal)):
+					comparison[name] = RemoteMerge.ADDED_DIR;
+						break;
+				}
 			}
 		}
 		return comparison;
 	}
 
-	static package(modifiedPath, comparison, zip, zipCurrentPath){
+	static generatePackage(modifiedDir, comparison, zip, zipCurrentPath){
 		zip = zip || new JSZip();
 		zipCurrentPath = zipCurrentPath || "";
 
@@ -94,7 +145,7 @@ class RemoteMerge {
 		} 
 		
 		return new Promise((resolve, reject) => {
-			fs.readdir(modifiedPath, async (err, list) => {
+			fs.readdir(modifiedDir, async (err, list) => {
 				if (err) {
 					reject(err);
 					return;
@@ -102,7 +153,7 @@ class RemoteMerge {
 				var listLen = list.length;
 				for (var i = 0; i < listLen; i++){
 					var name = list[i];
-					var fullPath = modifiedPath + '/' + name;
+					var fullPath = modifiedDir + '/' + name;
 
 					var comparisonVal = comparison[name];
 					if (typeof comparisonVal === typeof undefined){
@@ -122,8 +173,10 @@ class RemoteMerge {
 						//Added/Modified
 						case (RemoteMerge.isString(comparisonVal)):
 							switch (comparisonVal){
-								case RemoteMerge.ADDED:
-								case RemoteMerge.MODIFIED:
+								case RemoteMerge.ADDED_FILE:
+								case RemoteMerge.ADDED_DIR:
+								case RemoteMerge.MODIFIED_FILE:
+								case RemoteMerge.MODIFIED_DIR:
 									if (stat.isDirectory()){
 										if (DEBUG){
 											console.log("ADD FOLDER", relativePath, name);
@@ -147,7 +200,7 @@ class RemoteMerge {
 								console.log("ADD FOLDER", relativePath, name);
 							}
 							//Recurse
-							await RemoteMerge.package(fullPath, comparison[name], zip.folder(name), relativePath);
+							await RemoteMerge.generatePackage(fullPath, comparison[name], zip.folder(name), relativePath);
 							break;
 					}
 				}
@@ -205,14 +258,79 @@ class RemoteMerge {
 			});
 		});
 	}
+
+	static applyPackage(originalDir, comparison, zip){
+		comparison = this.comparison || null;
+
+		return new Promise(async (resolve, reject) => {
+			if (!comparison){
+				try {
+					comparison = JSON.parse(await zip.file(RemoteMerge.MANIFEST).async("string"));
+				} catch (err){
+					reject(err);
+					return;
+				}
+			}
+
+			for (var name in comparison){
+				var fullPath = originalDir + name;
+				var comparisonVal = comparison[name];
+				var stat = null;
+				if (fs.existsSync(fullPath)){
+					try {
+						stat = await RemoteMerge.stat(fullPath);
+					} catch (err){
+						reject(err);
+						return;
+					}
+				}
+
+				try {
+					switch (comparisonVal){
+						case RemoteMerge.DELETED:
+							if (stat){
+								//Delete
+								fs.unlinkSync(fullPath);
+							}
+							break;
+	
+						case RemoteMerge.MODIFIED_FILE:
+							if (stat){
+								//Delete
+								fs.unlinkSync(fullPath);
+							}
+						case RemoteMerge.ADDED_FILE:
+							await RemoteMerge.save(fullPath, await zip.file(name).async("nodebuffer"), false);
+							break;
+	
+						case RemoteMerge.MODIFIED_DIR:
+							if (stat){
+								//Delete
+								fs.unlinkSync(fullPath);
+							}
+						case RemoteMerge.ADDED_DIR:
+							fs.mkdirSync(fullPath);
+							//Recurse
+							await applyPackage(fullPath, comparison, zip.folder(name));
+							break;
+					}
+				} catch (err){
+					reject(err);
+					return;
+				}
+			}
+
+			resolve();
+		});
+	}
 	
 	static saveZip(zip, filePath){
 		filePath = filePath || "remote-merge_" + new Date().getTime() + ".zip";
 
 		return new Promise(async (resolve, reject) => {
-			var zipBuffer = null;
+			var buffer = null;
 			try {
-				zipBuffer = await zip.generateAsync({
+				buffer = await zip.generateAsync({
 					type:"nodebuffer",
 					compression:"DEFLATE",
 					compressionOptions:{
@@ -225,7 +343,23 @@ class RemoteMerge {
 				return;
 			}
 			
-			resolve(RemoteMerge.save(filePath, zipBuffer, false));
+			resolve(RemoteMerge.save(filePath, buffer, false));
+		});
+	}
+
+	static loadZip(filePath, zip){
+		zip = zip || new JSZip();
+
+		return new Promise(async (resolve, reject) => {
+			var buffer = null;
+			try {
+				buffer = await RemoteMerge.load(filePath, false)
+			} catch (err){
+				reject(err);
+				return;
+			}
+
+			resolve(zip.loadAsync(buffer));
 		});
 	}
 
@@ -300,8 +434,10 @@ class RemoteMerge {
 }
 //TODO: Reorganize these at top
 RemoteMerge.DELETED = "deleted";
-RemoteMerge.MODIFIED = "modified";
-RemoteMerge.ADDED = "added";
+RemoteMerge.MODIFIED_FILE = "modified_file";
+RemoteMerge.MODIFIED_DIR = "modified_dir";
+RemoteMerge.ADDED_FILE = "added_file";
+RemoteMerge.ADDED_DIR = "added_dir";
 RemoteMerge.MANIFEST = "manifest.json";
 
 module.exports = RemoteMerge;
