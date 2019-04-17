@@ -23,7 +23,7 @@ class RemoteMerge {
 				var originalSnapshot = await RemoteMerge.snapshot(originalDir, fileRegex, hashAlgorithm);
 				var modifiedSnapshot = await RemoteMerge.snapshot(modifiedDir, fileRegex, hashAlgorithm);
 				var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
-				var zip = await RemoteMerge.generatePackage(modifiedDir, comparison);
+				var zip = await RemoteMerge.generatePackage(modifiedDir, comparison, fileRegex);
 				resolve(RemoteMerge.saveZip(zip, zipOutput));
 			} catch (err){
 				reject(err);
@@ -138,7 +138,8 @@ class RemoteMerge {
 		return comparison;
 	}
 
-	static generatePackage(modifiedDir, comparison, zip, zipCurrentPath){
+	static generatePackage(modifiedDir, comparison, fileRegex, zip, zipCurrentPath){
+		fileRegex = fileRegex || REGEX_SNAPSHOT;
 		zip = zip || new JSZip();
 		zipCurrentPath = zipCurrentPath || "";
 
@@ -185,7 +186,7 @@ class RemoteMerge {
 										if (RemoteMerge.DEBUG){
 											console.log("ADD FOLDER", relativePath, name);
 										}
-										await RemoteMerge.dirToZip(fullPath, null, zip.folder(name), zipCurrentPath);
+										await RemoteMerge.dirToZip(fullPath, fileRegex, zip.folder(name), zipCurrentPath);
 									} else {
 										if (RemoteMerge.DEBUG){
 											console.log("ADD FILE", relativePath, name);
@@ -201,7 +202,7 @@ class RemoteMerge {
 								console.log("ADD FOLDER", relativePath, name);
 							}
 							//Recurse
-							await RemoteMerge.generatePackage(fullPath, comparison[name], zip.folder(name), relativePath);
+							await RemoteMerge.generatePackage(fullPath, comparison[name], fileRegex, zip.folder(name), relativePath);
 							break;
 					}
 				}
