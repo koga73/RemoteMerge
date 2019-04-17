@@ -32,7 +32,9 @@ await RemoteMerge.save("modified-snapshot.json", modifiedSnapshot);
 ```
 
 Note you can specify a file filter and hashing algorithm (MD5 by default)
-```RemoteMerge.snapshot("./test/a", /^.+\.txt$/, "sha256")```
+```
+RemoteMerge.snapshot("./test/a", /^.+\.txt$/, "sha256")
+```
 
 ### Compare
 
