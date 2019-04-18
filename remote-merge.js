@@ -41,7 +41,6 @@ class RemoteMerge {
 							console.log("Comparing snapshots");
 						}
 						var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot, fileRegex);
-						console.log(comparison);
 
 						if (RemoteMerge.DEBUG){
 							console.log("Generating package...");
@@ -126,7 +125,7 @@ class RemoteMerge {
 		var isRoot = currentPath == "";
 		if (!isRoot){
 			currentPath += "/";
-		} 
+		}
 
 		var comparison = {};
 		for (var name in originalSnapshot){
@@ -177,16 +176,15 @@ class RemoteMerge {
 
 		for (var name in modifiedSnapshot){
 			var fullPath = currentPath + name;
-			if (!fileRegex.test(fullPath)){
-				continue;
-			}
 			var command = null;
 			var modifiedVal = modifiedSnapshot[name];
 			if (typeof originalSnapshot[name] === typeof undefined){
 				switch (true){
 					//File
 					case (RemoteMerge.isString(modifiedVal)):
-						command = RemoteMerge.ADDED_FILE;
+						if (fileRegex.test(fullPath)){
+							command = RemoteMerge.ADDED_FILE;
+						}
 						break;
 					//Directory
 					case (RemoteMerge.isObject(modifiedVal)):
