@@ -12,6 +12,7 @@ const RemoteMerge = require("./remote-merge.js");
 		//Note that the zip filename is optional. If not specified one will be generated
 		//Note you can specify a file filter and hashing algorithm (MD5 by default)
 		//await RemoteMerge.generateMergePackage("./test/a", "./test/b", "package.zip", /^.+\.txt$/, "sha256");
+		//Look for only .yml files in "serialization" folders: /^.*serialization.*\.yml$/
 
 		//Advanced API
 		/*

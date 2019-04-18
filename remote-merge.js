@@ -18,24 +18,60 @@ class RemoteMerge {
 	}
 
 	static generateMergePackage(originalDir, modifiedDir, zipOutput, fileRegex, hashAlgorithm){
-		return new Promise(async (resolve, reject) => {
-			try {
-				var originalSnapshot = await RemoteMerge.snapshot(originalDir, fileRegex, hashAlgorithm);
-				var modifiedSnapshot = await RemoteMerge.snapshot(modifiedDir, fileRegex, hashAlgorithm);
-				var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot);
-				var zip = await RemoteMerge.generatePackage(modifiedDir, comparison, fileRegex);
-				resolve(RemoteMerge.saveZip(zip, zipOutput));
-			} catch (err){
-				reject(err);
-				return;
+		return new Promise((resolve, reject) => {
+			//Parallel
+			if (RemoteMerge.DEBUG){
+				console.log("Snapshoting original...");
 			}
+			var originalSnapshotPromise = RemoteMerge.snapshot(originalDir, fileRegex, hashAlgorithm);
+
+			if (RemoteMerge.DEBUG){
+				console.log("Snapshoting modified...");
+			}
+			var modifiedSnapshotPromise = RemoteMerge.snapshot(modifiedDir, fileRegex, hashAlgorithm);
+
+			return Promise.all([originalSnapshotPromise, modifiedSnapshotPromise])
+				.then(async (snapshots) => {
+					var originalSnapshot = snapshots[0];
+					var modifiedSnapshot = snapshots[1];
+
+					//Chain
+					try {
+						if (RemoteMerge.DEBUG){
+							console.log("Comparing snapshots");
+						}
+						var comparison = RemoteMerge.compare(originalSnapshot, modifiedSnapshot, fileRegex);
+						console.log(comparison);
+
+						if (RemoteMerge.DEBUG){
+							console.log("Generating package...");
+						}
+						var zip = await RemoteMerge.generatePackage(modifiedDir, comparison, fileRegex);
+
+						if (RemoteMerge.DEBUG){
+							console.log("Saving package");
+						}
+						resolve(RemoteMerge.saveZip(zip, zipOutput));
+					} catch (err){
+						reject(err);
+						return;
+					}
+				})
+				.catch(reject);
 		});
 	}
 
 	static applyMergePackage(originalDir, zipPath){
 		return new Promise(async (resolve, reject) => {
 			try {
+				if (RemoteMerge.DEBUG){
+					console.log("Loading package");
+				}
 				var zip = await RemoteMerge.loadZip(zipPath);
+
+				if (RemoteMerge.DEBUG){
+					console.log("Applying package...");
+				}
 				resolve(RemoteMerge.applyPackage(originalDir, zip));
 			} catch (err){
 				reject(err);
@@ -64,9 +100,12 @@ class RemoteMerge {
 						if (stat.isDirectory()){
 							tree[name] = await RemoteMerge.snapshot(fullPath, fileRegex, hashAlgorithm); //Recurse
 						} else {
+							//TODO: Don't include large files?
 							if (fileRegex.test(fullPath)){
-								//TODO: Don't include large files?
-								tree[name] = await RemoteMerge.fileChecksum(fullPath, hashAlgorithm); //Checksum
+								if (RemoteMerge.DEBUG){
+									console.log("Snapshot" + fullPath);
+								}
+								tree[name] = await RemoteMerge.fileChecksum(fullPath, hashAlgorithm);
 							}
 						}
 					} catch (err){
@@ -79,11 +118,23 @@ class RemoteMerge {
 		});
 	}
 
-	static compare(originalSnapshot, modifiedSnapshot){
+	static compare(originalSnapshot, modifiedSnapshot, fileRegex, currentPath){
+		fileRegex = fileRegex || REGEX_SNAPSHOT;
+		currentPath = currentPath || '';
+
+		//Increase path
+		var isRoot = currentPath == "";
+		if (!isRoot){
+			currentPath += "/";
+		} 
+
 		var comparison = {};
 		for (var name in originalSnapshot){
+			var fullPath = currentPath + name;
+			//Note we can't check fullPath here because we need to recurse
+			var command = null;
 			if (typeof modifiedSnapshot[name] === typeof undefined){
-				comparison[name] = RemoteMerge.DELETED;
+				command = RemoteMerge.DELETED;
 			} else {
 				var originalVal = originalSnapshot[name];
 				var modifiedVal = modifiedSnapshot[name];
@@ -94,11 +145,11 @@ class RemoteMerge {
 							switch (true){
 								//File
 								case (RemoteMerge.isString(originalVal)):
-									comparison[name] = RemoteMerge.MODIFIED_FILE;
-									break;
+									command = RemoteMerge.MODIFIED_FILE;
+								break;
 								//Directory
 								case (RemoteMerge.isObject(originalVal)):
-									comparison[name] = RemoteMerge.MODIFIED_DIR;
+									command = RemoteMerge.MODIFIED_DIR;
 									break;
 							}
 						}
@@ -108,31 +159,43 @@ class RemoteMerge {
 						switch (true){
 							//File
 							case (RemoteMerge.isString(modifiedVal)):
-								comparison[name] = RemoteMerge.MODIFIED_FILE;
+								command = RemoteMerge.MODIFIED_FILE;
 								break;
 							//Directory
 							case (RemoteMerge.isObject(modifiedVal)):
 								//Recurse
-								comparison[name] = RemoteMerge.compare(originalVal, modifiedVal);
+								comparison[name] = RemoteMerge.compare(originalVal, modifiedVal, fileRegex, fullPath);
 								break;
 						}
 						break;
 				}
 			}
+			if (command && fileRegex.test(fullPath)){
+				comparison[name] = command;
+			}
 		}
+
 		for (var name in modifiedSnapshot){
+			var fullPath = currentPath + name;
+			if (!fileRegex.test(fullPath)){
+				continue;
+			}
+			var command = null;
 			var modifiedVal = modifiedSnapshot[name];
 			if (typeof originalSnapshot[name] === typeof undefined){
 				switch (true){
 					//File
 					case (RemoteMerge.isString(modifiedVal)):
-						comparison[name] = RemoteMerge.ADDED_FILE;
+						command = RemoteMerge.ADDED_FILE;
 						break;
 					//Directory
 					case (RemoteMerge.isObject(modifiedVal)):
-					comparison[name] = RemoteMerge.ADDED_DIR;
+						command = RemoteMerge.ADDED_DIR;
 						break;
 				}
+			}
+			if (command){
+				comparison[name] = command;
 			}
 		}
 		return comparison;
